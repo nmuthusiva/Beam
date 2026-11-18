@@ -10,7 +10,13 @@ import type { AuthoringApi } from './authoring-api';
 import type { ScreenshotApi } from './screenshot';
 import type { TranscriptExportRequest, TranscriptExportResult } from './transcript';
 import type { PresetKind } from '@beam/engine/capture/capture-mode';
-import type { CaptureConfig, CreateProjectOptions, StartRecordingOptions } from './capture-config';
+import type {
+  CaptureConfig,
+  CombineProjectsOptions,
+  CreateProjectOptions,
+  ProjectCombineProgress,
+  StartRecordingOptions,
+} from './capture-config';
 import type {
   ScreenRegion,
   ScreenRegionBounds,
@@ -244,6 +250,8 @@ export interface DesktopCaptureApi
   onCursorPacksChanged(listener: () => void): () => void;
   openCursorPackDiscovery(): Promise<void>;
   createProject(options?: CreateProjectOptions): Promise<CaptureProject>;
+  combineProjects(options: CombineProjectsOptions): Promise<CaptureProject>;
+  onCombineProgress?(listener: (progress: ProjectCombineProgress) => void): () => void;
   renameProject(projectId: string, name: string, mode?: CaptureMode): Promise<CaptureProject>;
   deleteProject(projectId: string, mode?: CaptureMode): Promise<void>;
   revealProject(projectId: string, mode?: CaptureMode): Promise<boolean>;

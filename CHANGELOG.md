@@ -4,6 +4,15 @@ User-facing changes to Beam are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Combine multiple selected projects in the Projects library: select two or more projects to open an interactive reordering dialog, choose the playback sequence, and choose whether to preserve original projects as a new combined copy or merge and delete the originals.
+- Real-time combine progress tracking with live status updates (showing completed videos and current video in progress with percentage), an overall progress bar, and a prominent caution alert advising against closing or interrupting during project combining.
+- Multi-select projects using standard file selection shortcuts: Ctrl+Click (Cmd+Click) to toggle selection of individual projects, Shift+Click to range-select between projects, and Ctrl+A to select all projects, matching Windows File Explorer behavior.
+- Sort projects in the Projects library header by date (newest or oldest first), video length (longest or shortest first), or name (A–Z or Z–A).
+- Display created time, modified time, and formatted video duration badges on project cards in the Projects library.
+- Highlight the Projects button in the HUD topbar with an orange badge and visible "Projects" label next to the folder icon.
+
 ## [0.6.2] - 2026-11-17
 
 ### Added

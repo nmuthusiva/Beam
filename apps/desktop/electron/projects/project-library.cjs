@@ -1,3 +1,5 @@
+const { combineProjects } = require('./project-combine.cjs');
+
 // A common catalogue with explicit dispatch to each project's storage format.
 function createProjectLibrary(projectStore, screenshotStore) {
   const screenshotSummary = (document) => screenshotStore.readSummary(document.id);
@@ -28,6 +30,9 @@ function createProjectLibrary(projectStore, screenshotStore) {
       const store = storeFor(mode);
       if (mode === 'screenshot') store.read(id);
       return store.directoryFor(id);
+    },
+    combine(projectIds, options) {
+      return combineProjects(projectStore, screenshotStore, projectIds, options);
     },
   };
 }

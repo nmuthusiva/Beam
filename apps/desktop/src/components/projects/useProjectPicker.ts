@@ -10,129 +10,69 @@ import { useProjectCatalog } from './useProjectCatalog';
 import { useProjectCreation } from './useProjectCreation';
 import { createProjectPickerRefresh } from './project-picker-refresh';
 import type { ProjectPickerProps, ProjectPickerEmit } from './project-picker-types';
+import { useProjectSort } from './useProjectSort';
+import { useProjectCombine } from './useProjectCombine';
+import { useProjectSelection } from './useProjectSelection';
 
 export function useProjectPicker(props: ProjectPickerProps, emit: ProjectPickerEmit) {
   const { t } = useTranslate('ProjectPicker');
-  const dateFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
+  const dateFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
   const selectedProjectId = ref<string | null>(null);
 
-  const isSelectionMode = ref(false);
-  const selectedBatchIds = ref<Set<string>>(new Set());
-  const isDeletingBatch = ref(false);
-  const deleteBatchError = ref('');
-  const isSelectingAll = ref(false);
-  let selectionGeneration = 0;
-
-  const isAllSelected = computed(() => {
-    const list = filteredProjects.value;
-    return (
-      catalog.total.value > 0 &&
-      selectedBatchIds.value.size === catalog.total.value &&
-      list.every((p) => selectedBatchIds.value.has(p.id))
-    );
-  });
-
-  const isSomeSelected = computed(() => {
-    const list = filteredProjects.value;
-    const count = list.filter((p) => selectedBatchIds.value.has(p.id)).length;
-    return count > 0 && !isAllSelected.value;
-  });
-
-  const toggleSelectionMode = () => {
-    if (isSearchOpen.value) {
-      isSearchOpen.value = false;
-      searchQuery.value = '';
-    }
-    isSelectionMode.value = !isSelectionMode.value;
-    if (!isSelectionMode.value) {
-      selectionGeneration++;
-      selectedBatchIds.value = new Set();
-    }
-  };
-
-  const cancelSelectionMode = () => {
-    selectionGeneration++;
-    isSelectionMode.value = false;
-    selectedBatchIds.value = new Set();
-  };
-
-  const toggleBatchSelect = (id: string) => {
-    const next = new Set(selectedBatchIds.value);
-    if (next.has(id)) {
-      next.delete(id);
-    } else {
-      next.add(id);
-    }
-    selectedBatchIds.value = next;
-  };
-
-  const toggleSelectAll = async () => {
-    if (isSelectingAll.value) return;
-    if (isAllSelected.value) {
-      selectedBatchIds.value = new Set();
-    } else {
-      if (catalog.hasMore.value) {
-        const current = ++selectionGeneration;
-        isSelectingAll.value = true;
-        try {
-          await catalog.loadAll();
-          if (current !== selectionGeneration || !isSelectionMode.value || props.active === false) return;
-        } catch (error) {
-          deleteBatchError.value = error instanceof Error ? error.message : String(error);
-          return;
-        } finally {
-          isSelectingAll.value = false;
-        }
-      }
-      selectedBatchIds.value = new Set(filteredProjects.value.map((p) => p.id));
-    }
-  };
-
-  const handleDeleteBatch = async () => {
-    if (selectedBatchIds.value.size === 0 || isDeletingBatch.value) return;
-    isDeletingBatch.value = true;
-    deleteBatchError.value = '';
-    try {
-      const ids = Array.from(selectedBatchIds.value);
-      for (const id of ids) {
-        const project = projects.value.find((item) => item.id === id);
-        if (project?.mode === 'screenshot') await capture.deleteProject(id, 'screenshot');
-        else await capture.deleteProject(id);
-        if (project) emit('delete-project', project);
-      }
-      const wasSelectedDeleted = selectedProjectId.value && selectedBatchIds.value.has(selectedProjectId.value);
-      selectedBatchIds.value = new Set();
-      isSelectionMode.value = false;
-      catalog.invalidate();
-      await loadProjects();
-
-      if (wasSelectedDeleted) {
-        const remaining = projects.value;
-        const nextProject = remaining[0] ?? null;
-        if (nextProject) {
-          selectedProjectId.value = nextProject.id;
-          emit('select-project', nextProject);
-        } else {
-          selectedProjectId.value = null;
-        }
-      }
-    } catch (error) {
-      deleteBatchError.value = error instanceof Error ? error.message : String(error);
-    } finally {
-      isDeletingBatch.value = false;
-    }
+  const selectProject = (project: CaptureProject) => {
+    selectedProjectId.value = project.id;
+    if (props.compact) emit('select-project', project);
   };
 
   const { isSearchOpen, searchQuery, searchInputRef, toggleSearch, clearSearch, handleSearchKeydown } =
-    useProjectSearch(() => !props.compact && !isNewProjectOpen.value && !renameProjectId.value, cancelSelectionMode);
+    useProjectSearch(() => !props.compact && !isNewProjectOpen.value && !renameProjectId.value, () => selection.cancelSelectionMode());
   const catalog = useProjectCatalog(searchQuery, () => props.active !== false);
   const { projects, isLoading, errorMessage, isLoadingMore, loadMoreError } = catalog;
 
+  const { currentSort, sortOptions, setSort, sortProjects } = useProjectSort((sort) => {
+    if (sort !== 'date-desc' && catalog.hasMore.value) {
+      void catalog.loadAll();
+    }
+  });
+
   const filteredProjects = computed(() => {
     const query = searchQuery.value.trim().toLowerCase();
-    if (!query) return projects.value;
-    return projects.value.filter((project) => project.name.toLowerCase().includes(query));
+    const base = query ? projects.value.filter((project) => project.name.toLowerCase().includes(query)) : projects.value;
+    return sortProjects(base);
+  });
+
+  const selection = useProjectSelection({
+    projects,
+    filteredProjects,
+    totalProjects: catalog.total,
+    hasMore: catalog.hasMore,
+    loadAll: catalog.loadAll,
+    invalidateCatalog: catalog.invalidate,
+    loadProjects: () => loadProjects(),
+    selectedProjectId,
+    selectProject,
+    isSearchOpen,
+    searchQuery,
+    isActive: () => props.active !== false,
+    onDeleteProject: (project) => emit('delete-project', project),
+    onSelectProject: (project) => {
+      if (project) emit('select-project', project);
+    },
+  });
+
+  const combine = useProjectCombine({
+    projects,
+    selectedBatchIds: selection.selectedBatchIds,
+    refresh: async () => {
+      catalog.invalidate();
+      await loadProjects();
+    },
+    cancelSelection: selection.cancelSelectionMode,
+    onProjectCreated: (created) => {
+      selectProject(created);
+      emit('select-project', created);
+    },
   });
 
   const { list, containerProps, wrapperProps, gridRef, gridStyle } = useProjectGrid(
@@ -171,26 +111,15 @@ export function useProjectPicker(props: ProjectPickerProps, emit: ProjectPickerE
   const maskStyle = computed(() => {
     const top = hasTopShadow.value;
     const bottom = hasBottomShadow.value;
-    if (top && bottom) {
-      return {
-        maskImage: 'linear-gradient(to bottom, transparent 0%, black 24px, black calc(100% - 24px), transparent 100%)',
-        WebkitMaskImage:
-          'linear-gradient(to bottom, transparent 0%, black 24px, black calc(100% - 24px), transparent 100%)',
-      };
-    }
-    if (top) {
-      return {
-        maskImage: 'linear-gradient(to bottom, transparent 0%, black 24px, black 100%)',
-        WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 24px, black 100%)',
-      };
-    }
-    if (bottom) {
-      return {
-        maskImage: 'linear-gradient(to bottom, black 0%, black calc(100% - 24px), transparent 100%)',
-        WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black calc(100% - 24px), transparent 100%)',
-      };
-    }
-    return {};
+    const grad =
+      top && bottom
+        ? 'linear-gradient(to bottom, transparent 0%, black 24px, black calc(100% - 24px), transparent 100%)'
+        : top
+          ? 'linear-gradient(to bottom, transparent 0%, black 24px, black 100%)'
+          : bottom
+            ? 'linear-gradient(to bottom, black 0%, black calc(100% - 24px), transparent 100%)'
+            : null;
+    return grad ? { maskImage: grad, WebkitMaskImage: grad } : {};
   });
 
   const previews = useProjectPreviews(
@@ -242,18 +171,14 @@ export function useProjectPicker(props: ProjectPickerProps, emit: ProjectPickerE
     }
   };
 
-  const selectProject = (project: CaptureProject) => {
-    selectedProjectId.value = project.id;
-    if (props.compact) emit('select-project', project);
-  };
-
   const openSelectedProject = () => {
     if (selectedProject.value && selectedProject.value.id !== props.currentProjectId) {
       emit('open-project', selectedProject.value);
     }
   };
 
-  const formatDate = (date: string) => {
+  const formatDate = (date?: string | null) => {
+    if (!date) return t('dateUnknown');
     const parsedDate = new Date(date);
     if (Number.isNaN(parsedDate.getTime())) return t('dateUnknown');
     return dateFormatter.format(parsedDate);
@@ -269,7 +194,7 @@ export function useProjectPicker(props: ProjectPickerProps, emit: ProjectPickerE
     (active) => {
       reopeningRefresh.cancel();
       if (!active) {
-        selectionGeneration++;
+        selection.cancelSelectionMode();
         return;
       }
       if (catalog.hasLoaded()) reopeningRefresh.schedule();
@@ -421,20 +346,10 @@ export function useProjectPicker(props: ProjectPickerProps, emit: ProjectPickerE
     isSearchOpen,
     searchQuery,
     searchInputRef,
-    isSelectionMode,
-    selectedBatchIds,
-    isDeletingBatch,
-    isAllSelected,
-    isSomeSelected,
-    isSelectingAll,
+    ...selection,
     isLoadingMore,
     loadMoreError,
     loadMore: catalog.loadMore,
-    toggleSelectionMode,
-    cancelSelectionMode,
-    toggleBatchSelect,
-    toggleSelectAll,
-    handleDeleteBatch,
     toggleSearch,
     clearSearch,
     handleSearchKeydown,
@@ -443,12 +358,16 @@ export function useProjectPicker(props: ProjectPickerProps, emit: ProjectPickerE
     selectedProject,
     isRefreshing,
     isRefreshSuccess,
-    loadProjects,
+    loadProjects: () => loadProjects(),
     handleRefresh,
     selectProject,
     openSelectedProject,
     formatDate,
     handleProjectOpen,
+    currentSort,
+    sortOptions,
+    setSort,
+    ...combine,
     ...creation,
     renameProjectId,
     renameValue,

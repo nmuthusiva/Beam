@@ -405,6 +405,12 @@ contextBridge.exposeInMainWorld(
     },
     openCursorPackDiscovery: () => ipcRenderer.invoke('cursor-packs:open-discovery'),
     createProject: (options = {}) => ipcRenderer.invoke('projects:create', options),
+    combineProjects: (payload = {}) => ipcRenderer.invoke('projects:combine', payload),
+    onCombineProgress: (listener) => {
+      const callback = (_event, progress) => listener(progress);
+      ipcRenderer.on('projects:combine-progress', callback);
+      return () => ipcRenderer.removeListener('projects:combine-progress', callback);
+    },
     renameProject: (projectId, name, mode) => ipcRenderer.invoke('projects:rename', { projectId, name, mode }),
     saveProjectThumbnail: (projectId, dataUrl) => ipcRenderer.invoke('projects:save-thumbnail', { projectId, dataUrl }),
     deleteProject: (projectId, mode) => ipcRenderer.invoke('projects:delete', { projectId, mode }),

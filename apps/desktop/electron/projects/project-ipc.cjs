@@ -61,6 +61,15 @@ function registerProjectIpc(
     );
     return screenshotStore.readSummary(document.id);
   });
+  ipcMain.handle('projects:combine', (event, payload = {}) => {
+    if (!trustedRenderer?.(event.sender.getURL())) throw new Error('Renderer non autorisé');
+    const onProgress = (progress) => {
+      try {
+        event.sender.send('projects:combine-progress', progress);
+      } catch {}
+    };
+    return library.combine(payload.projectIds, { ...payload.options, onProgress });
+  });
   ipcMain.handle('projects:rename', (_event, payload = {}) =>
     library.rename(payload.projectId, payload.name, payload.mode),
   );

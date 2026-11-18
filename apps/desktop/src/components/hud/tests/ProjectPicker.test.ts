@@ -591,6 +591,29 @@ describe('ProjectPicker', () => {
     expect(capture.deleteProject).toHaveBeenCalledWith('two');
     expect(wrapper.find('.project-selection-bar').isVisible()).toBe(false);
   });
+  it('supports Ctrl+Click and Shift+Click for Windows-style multi-selection', async () => {
+    capture.listProjects.mockResolvedValue(projects);
+    const wrapper = mount(ProjectPicker, {
+      attachTo: document.body,
+      global: { stubs },
+    });
+    await settle();
+
+    const cards = wrapper.findAll('.project-card');
+    expect(cards).toHaveLength(2);
+
+    // Ctrl+Click second card: enters selection mode with both first (already selected) and second selected
+    await cards[1].trigger('click', { ctrlKey: true });
+    await settle();
+
+    expect(wrapper.find('.project-selection-bar').isVisible()).toBe(true);
+    expect(wrapper.find('.selection-bar-right button.btn-danger').text()).toContain('Delete (2)');
+
+    // Ctrl+Click first card: unselects first card
+    await cards[0].trigger('click', { ctrlKey: true });
+    await settle();
+    expect(wrapper.find('.selection-bar-right button.btn-danger').text()).toContain('Delete (1)');
+  });
   it('cancels multi-selection mode when cancel button is clicked', async () => {
     capture.listProjects.mockResolvedValue(projects);
     const wrapper = mount(ProjectPicker, {

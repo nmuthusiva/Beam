@@ -70,6 +70,7 @@ export const captureMock = {
     return { projects: matches, total: matches.length, nextCursor: null };
   }),
   createProject: vi.fn(),
+  combineProjects: vi.fn(),
   renameProject: vi.fn(),
   deleteProject: vi.fn(),
   revealProject: vi.fn(),
@@ -125,4 +126,6 @@ export const captureMock = {
   quitAndInstallUpdate: vi.fn(),
   openUpdateChangelog: vi.fn(),
   onUpdateState: vi.fn().mockReturnValue(() => undefined),
+  combineProjects: vi.fn().mockResolvedValue({ id: 'combined-mock-id', name: 'Combined' }),
+  onCombineProgress: vi.fn().mockReturnValue(() => undefined),
 };

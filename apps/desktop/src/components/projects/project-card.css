@@ -167,16 +167,12 @@
   margin-right: 4px;
 }
 
-.project-card-name,
-.project-card-meta {
+.project-card-name {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   width: 100%;
   text-align: left;
-}
-
-.project-card-name {
   font-size: 11px;
   font-weight: 700;
   flex: 1;
@@ -201,10 +197,47 @@
 }
 
 .project-card-meta {
-  padding-top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 2px;
+  width: 100%;
+  text-align: left;
+}
+
+.project-card-meta-line {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  width: 100%;
   color: var(--text-muted);
   font-size: 9px;
-  line-height: 1.1;
+  line-height: 1.2;
+}
+
+.project-card-meta-line .meta-label {
+  opacity: 0.85;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.project-card-meta-line .meta-value {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.project-card-meta-line .meta-separator {
+  opacity: 0.5;
+  margin: 0 1px;
+  flex-shrink: 0;
+}
+
+.project-card-meta-line .meta-duration {
+  flex-shrink: 0;
 }
 
 .project-skeleton-grid {

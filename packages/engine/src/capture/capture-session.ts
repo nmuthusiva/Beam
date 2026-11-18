@@ -41,6 +41,7 @@ export interface CaptureProject {
   sessionCount: number;
   previewSrc: string | null;
   thumbnailSrc?: string | null;
+  durationMs?: number;
   hasScreen?: boolean;
   hasCamera?: boolean;
   hasCaption?: boolean;

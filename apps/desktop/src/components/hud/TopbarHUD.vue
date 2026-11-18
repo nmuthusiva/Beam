@@ -12,6 +12,7 @@ import type { BrandSymbol } from '../brand/brand-types';
 
 const { t } = useTranslate('TopbarHUD');
 const { t: tHud } = useTranslate('HUD');
+const { t: tProjects } = useTranslate('ProjectPicker');
 const openPopovers = reactive(new Set<string>());
 provide(popoverOpenStateKey, (id, open) => {
   if (open) openPopovers.add(id);
@@ -58,14 +59,15 @@ useActionShortcuts(() => [
         v-if="showProjects"
         variant="ghost"
         size="xs"
-        icon-only
         :icon="FolderOpen"
-        class="window-action"
+        class="window-action projects-action"
         :disabled="disabled"
         :aria-label="tHud('openProject')"
         :title="tHud('openProject')"
         @click="emit('open-projects')"
-      />
+      >
+        <span class="projects-action-text">{{ tProjects('projects') }}</span>
+      </Button>
       <span v-if="showSettings" class="settings-action">
         <Button
           variant="ghost"
@@ -150,5 +152,32 @@ useActionShortcuts(() => [
 .window-actions :deep(.close-button:hover) {
   background: var(--color-error);
   color: var(--text-light);
+}
+
+.projects-action {
+  width: auto !important;
+  height: 26px !important;
+  padding: 0 8px !important;
+  gap: 5px !important;
+  color: #ff8a5c !important;
+  background: rgba(255, 138, 92, 0.14) !important;
+  border: 1px solid rgba(255, 138, 92, 0.28) !important;
+  border-radius: var(--radius-xs) !important;
+  font-weight: 600 !important;
+  font-size: 11px !important;
+  line-height: 1 !important;
+}
+
+.projects-action:hover:not(:disabled) {
+  background: rgba(255, 138, 92, 0.24) !important;
+  border-color: rgba(255, 138, 92, 0.45) !important;
+  color: #ff8a5c !important;
+}
+
+.projects-action-text {
+  font-size: 11px;
+  font-weight: 600;
+  color: inherit;
+  letter-spacing: -0.2px;
 }
 </style>

@@ -55,7 +55,9 @@ function validSummary(value) {
       (key) =>
         value[key] === null ||
         (typeof value[key] === 'string' && value[key].length <= 4096 && value[key].startsWith('project-media://')),
-    ),
+    ) &&
+    (value.durationMs === undefined ||
+      (typeof value.durationMs === 'number' && Number.isFinite(value.durationMs) && value.durationMs >= 0)),
   );
 }
 module.exports = { validatePageRequest, decodeCursor, validSummary, UUID };

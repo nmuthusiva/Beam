@@ -5,6 +5,22 @@ export interface CreateProjectOptions {
   mode?: 'studio' | 'screenshot';
 }
 
+export interface CombineProjectsOptions {
+  projectIds: string[];
+  name?: string;
+  deleteOriginals?: boolean;
+}
+
+export interface ProjectCombineProgress {
+  current: number;
+  total: number;
+  percent: number;
+  currentProjectName?: string;
+  completedProjectName?: string;
+  stage?: 'preparing' | 'processing' | 'processed' | 'finalizing' | 'cleaning' | 'done';
+  status?: string;
+}
+
 export interface StartRecordingOptions {
   projectId?: string;
   screenKind?: 'display' | 'window';

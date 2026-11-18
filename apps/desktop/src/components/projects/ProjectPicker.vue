@@ -9,6 +9,7 @@ import {
   Pencil,
   Search,
   ExternalLink,
+  Layers,
   Trash2,
   X,
 } from '@lucide/vue';
@@ -17,6 +18,8 @@ import ButtonGroup from '~/ui/button/ButtonGroup.vue';
 import Checkbox from '~/ui/checkbox/Checkbox.vue';
 import Divider from '~/ui/divider/Divider.vue';
 import ProjectCreateDialog from './ProjectCreateDialog.vue';
+import ProjectCombineDialog from './ProjectCombineDialog.vue';
+import ProjectSortMenu from './ProjectSortMenu.vue';
 import Popover from '~/ui/popover/Popover.vue';
 import Input from '~/ui/input/Input.vue';
 import Skeleton from '~/ui/skeleton/Skeleton.vue';
@@ -26,6 +29,7 @@ import ProjectModeIcon from './ProjectModeIcon.vue';
 import ProjectTitle from './ProjectTitle.vue';
 import ProjectCardPreview from './ProjectCardPreview.vue';
 import ProjectCatalogError from './ProjectCatalogError.vue';
+import { formatProjectDuration } from './project-format-duration';
 import { useProjectPicker } from './useProjectPicker';
 import type { ProjectPickerProps, ProjectPickerEvents } from './project-picker-types';
 const props = withDefaults(defineProps<Partial<ProjectPickerProps>>(), {
@@ -54,6 +58,7 @@ const {
   toggleSelectionMode,
   cancelSelectionMode,
   toggleBatchSelect,
+  handleProjectClick,
   toggleSelectAll,
   handleDeleteBatch,
   toggleSearch,
@@ -68,6 +73,15 @@ const {
   selectProject,
   formatDate,
   handleProjectOpen,
+  currentSort,
+  setSort,
+  isCombineOpen,
+  isCombining,
+  combineError,
+  combineProgress,
+  selectedCombineProjects,
+  openCombineDialog,
+  handleCombine,
   isNewProjectOpen,
   newProjectName,
   newProjectMode,
@@ -131,6 +145,8 @@ defineExpose({ refresh: loadProjects, invalidate });
             @click="toggleSearch"
           />
           <Divider orientation="vertical" spacing="none" />
+          <ProjectSortMenu :model-value="currentSort" @update:model-value="setSort" />
+          <Divider orientation="vertical" spacing="none" />
           <Button
             variant="ghost"
             size="xs"
@@ -188,6 +204,16 @@ defineExpose({ refresh: loadProjects, invalidate });
             />
           </div>
           <div class="selection-bar-right">
+            <Button
+              variant="primary"
+              size="xs"
+              :icon="Layers"
+              :disabled="selectedBatchIds.size < 2 || isSelectingAll || isDeletingBatch"
+              :tooltip="t('combineProjects')"
+              @click="openCombineDialog"
+            >
+              {{ t('combine') }} ({{ selectedBatchIds.size }})
+            </Button>
             <Button variant="ghost" size="xs" :tooltip="t('cancel')" @click="cancelSelectionMode">
               {{ t('cancel') }}
             </Button>
@@ -301,10 +327,10 @@ defineExpose({ refresh: loadProjects, invalidate });
                   tabindex="0"
                   @mouseenter="handleProjectMouseEnter(project, $event)"
                   @mouseleave="handleProjectMouseLeave(project, $event)"
-                  @click="isSelectionMode ? toggleBatchSelect(project.id) : selectProject(project)"
+                  @click="handleProjectClick(project, $event)"
                   @dblclick="isSelectionMode ? toggleBatchSelect(project.id) : handleProjectOpen(project)"
                   @keydown.enter.self="isSelectionMode ? toggleBatchSelect(project.id) : handleProjectOpen(project)"
-                  @keydown.space.self="isSelectionMode ? toggleBatchSelect(project.id) : selectProject(project)"
+                  @keydown.space.self="handleProjectClick(project)"
                 >
                   <ProjectCardPreview
                     :project="project"
@@ -387,57 +413,18 @@ defineExpose({ refresh: loadProjects, invalidate });
                                   {{ deleteError }}
                                 </p>
                                 <div class="delete-confirm-actions">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    :disabled="deleteBusy"
-                                    @click.stop="
-                                      deleteConfirmProjectId = null;
-                                      deleteError = '';
-                                    "
-                                    >{{ t('cancel') }}</Button
-                                  >
-                                  <Button
-                                    variant="danger"
-                                    size="sm"
-                                    :loading="deleteBusy"
-                                    @click.stop="handleDeleteProject().then(() => close())"
-                                    >{{ t('delete') }}</Button
-                                  >
+                                  <Button variant="ghost" size="sm" :disabled="deleteBusy" @click.stop="deleteConfirmProjectId = null; deleteError = ''">{{ t('cancel') }}</Button>
+                                  <Button variant="danger" size="sm" :loading="deleteBusy" @click.stop="handleDeleteProject().then(() => close())">{{ t('delete') }}</Button>
                                 </div>
                               </template>
                               <template v-else>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  :icon="Pencil"
-                                  class="menu-action-item"
-                                  @click.stop="
-                                    startRename(project);
-                                    close();
-                                  "
-                                >
+                                <Button variant="ghost" size="sm" :icon="Pencil" class="menu-action-item" @click.stop="startRename(project); close()">
                                   {{ t('rename') }}
                                 </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  :icon="ExternalLink"
-                                  class="menu-action-item"
-                                  @click.stop="
-                                    revealProjectFolder(project);
-                                    close();
-                                  "
-                                >
+                                <Button variant="ghost" size="sm" :icon="ExternalLink" class="menu-action-item" @click.stop="revealProjectFolder(project); close()">
                                   {{ t('explore') }}
                                 </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  :icon="Trash2"
-                                  class="menu-action-item delete-item"
-                                  @click.stop="confirmDeleteProject(project)"
-                                >
+                                <Button variant="ghost" size="sm" :icon="Trash2" class="menu-action-item delete-item" @click.stop="confirmDeleteProject(project)">
                                   {{ t('delete') }}
                                 </Button>
                               </template>
@@ -446,9 +433,26 @@ defineExpose({ refresh: loadProjects, invalidate });
                         </Popover>
                       </div>
                     </div>
-                    <span class="project-card-meta">
-                      {{ formatDate(project.updatedAt) }}
-                    </span>
+                    <div class="project-card-meta">
+                      <span
+                        class="project-card-meta-line"
+                        :title="`${t('created')}: ${formatDate(project.createdAt || project.updatedAt)}`"
+                      >
+                        <span class="meta-label">{{ t('created') }}:</span>
+                        <span class="meta-value">{{ formatDate(project.createdAt || project.updatedAt) }}</span>
+                      </span>
+                      <span
+                        class="project-card-meta-line"
+                        :title="`${t('modified')}: ${formatDate(project.updatedAt || project.createdAt)}`"
+                      >
+                        <span class="meta-label">{{ t('modified') }}:</span>
+                        <span class="meta-value">{{ formatDate(project.updatedAt || project.createdAt) }}</span>
+                        <template v-if="project.durationMs">
+                          <span class="meta-separator" aria-hidden="true">•</span>
+                          <span class="meta-duration">{{ formatProjectDuration(project.durationMs) }}</span>
+                        </template>
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -467,6 +471,14 @@ defineExpose({ refresh: loadProjects, invalidate });
       :busy="newProjectBusy"
       :error="newProjectError"
       @create="handleCreateProject"
+    />
+    <ProjectCombineDialog
+      v-model:open="isCombineOpen"
+      :projects="selectedCombineProjects"
+      :busy="isCombining"
+      :error="combineError"
+      :progress="combineProgress"
+      @combine="handleCombine"
     />
   </section>
 </template>
